@@ -13,6 +13,7 @@
 #include "controls/ctrlGroup.h"
 #include "controls/ctrlImage.h"
 #include "controls/ctrlOptionGroup.h"
+#include "controls/ctrlTab.h"
 #include "helpers/containerUtils.h"
 #include "iwDemolishBuilding.h"
 #include "iwHQ.h"
@@ -29,7 +30,6 @@ namespace {
 enum
 {
     // From iwWares
-    ID_PAGINATE = 0,
     ID_HELP = 12,
     // New
     ID_STORE_SETTINGS_GROUP,
@@ -83,11 +83,7 @@ iwBaseWarehouse::iwBaseWarehouse(GameWorldView& gwv, GameCommandFactory& gcFacto
     // Add demolish button if not HQ
     if(wh->GetGOT() != GO_Type::NobHq)
     {
-        // Make paginate button smaller and move to make space for demolish button
-        GetCtrl<ctrlButton>(ID_PAGINATE)->SetWidth(32);
-        GetCtrl<ctrlButton>(ID_PAGINATE)->SetPos(DrawPoint(86, GetFullSize().y - 47));
-
-        AddImageButton(ID_DEMOLISH, DrawPoint(52, GetFullSize().y - 47), Extent(32, 32), TextureColor::Grey,
+        AddImageButton(ID_DEMOLISH, DrawPoint(86, GetFullSize().y - 47), Extent(32, 32), TextureColor::Grey,
                        LOADER.GetImageN("io", 23), _("Demolish house"));
     }
 }
@@ -100,13 +96,13 @@ iwBaseWarehouse::~iwBaseWarehouse()
 
 void iwBaseWarehouse::Msg_Group_ButtonClick(const unsigned group_id, const unsigned ctrl_id)
 {
-    if(group_id != warePageID && group_id != peoplePageID)
-        iwWares::Msg_Group_ButtonClick(group_id, ctrl_id);
-    else
+    if(group_id == tabCtrl->GetID())
     {
         if(GAMECLIENT.IsReplayModeOn())
             return;
-        RTTR_Assert(GetCurPage() == peoplePageID || GetCurPage() == warePageID);
+        unsigned curPage = GetCurPage();
+        if(curPage != warePageID && curPage != peoplePageID)
+            return;
         auto* optiongroup = GetCtrl<ctrlOptionGroup>(ID_STORE_SETTINGS_GROUP);
 
         EInventorySetting setting;
@@ -127,11 +123,12 @@ void iwBaseWarehouse::Msg_Group_ButtonClick(const unsigned group_id, const unsig
                 UpdateOverlay(rttr::enum_cast(what));
             }
         };
-        if(GetCurPage() == warePageID)
+        if(curPage == warePageID)
             setSetting(GoodType(ctrl_id - 100), setting);
         else
             setSetting(Job(ctrl_id - 100), setting);
-    }
+    } else
+        iwWares::Msg_Group_ButtonClick(group_id, ctrl_id);
 }
 
 void iwBaseWarehouse::Msg_ButtonClick(const unsigned ctrl_id)
@@ -265,10 +262,16 @@ void iwBaseWarehouse::SetPage(unsigned page)
 {
     iwWares::SetPage(page);
     const bool showStorageSettings = GetCurPage() == warePageID || GetCurPage() == peoplePageID;
-    GetCtrl<ctrlOptionGroup>(ID_STORE_SETTINGS_GROUP)->GetButton(ID_COLLECT)->SetEnabled(showStorageSettings);
-    GetCtrl<ctrlOptionGroup>(ID_STORE_SETTINGS_GROUP)->GetButton(ID_STOP)->SetEnabled(showStorageSettings);
-    GetCtrl<ctrlOptionGroup>(ID_STORE_SETTINGS_GROUP)->GetButton(ID_TAKEOUT)->SetEnabled(showStorageSettings);
-    GetCtrl<ctrlButton>(ID_SELECT_ALL)->SetEnabled(showStorageSettings);
+    auto* optGroup = GetCtrl<ctrlOptionGroup>(ID_STORE_SETTINGS_GROUP);
+    if(optGroup)
+    {
+        optGroup->GetButton(ID_COLLECT)->SetEnabled(showStorageSettings);
+        optGroup->GetButton(ID_STOP)->SetEnabled(showStorageSettings);
+        optGroup->GetButton(ID_TAKEOUT)->SetEnabled(showStorageSettings);
+    }
+    auto* selAllBtn = GetCtrl<ctrlButton>(ID_SELECT_ALL);
+    if(selAllBtn)
+        selAllBtn->SetEnabled(showStorageSettings);
 }
 
 void iwBaseWarehouse::UpdateOverlay(unsigned i)
@@ -278,7 +281,7 @@ void iwBaseWarehouse::UpdateOverlay(unsigned i)
 
 void iwBaseWarehouse::UpdateOverlay(unsigned i, bool isWare)
 {
-    auto* group = GetCtrl<ctrlGroup>(isWare ? warePageID : peoplePageID);
+    auto* group = tabCtrl->GetGroup(isWare ? warePageID : peoplePageID);
     // Einlagern verbieten-Bild (de)aktivieren
     auto* image = group->GetCtrl<ctrlImage>(400 + i);
     if(image)

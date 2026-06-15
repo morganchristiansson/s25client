@@ -10,10 +10,10 @@
 #include "Loader.h"
 #include "WindowManager.h"
 #include "WineLoader.h"
-#include "addons/const_addons.h"
 #include "controls/ctrlButton.h"
 #include "controls/ctrlGroup.h"
 #include "controls/ctrlImage.h"
+#include "controls/ctrlTab.h"
 #include "controls/ctrlText.h"
 #include "iwHelp.h"
 #include "ogl/FontStyle.h"
@@ -23,7 +23,7 @@
 #include "gameData/ShieldConsts.h"
 
 namespace {
-constexpr unsigned ID_pageOffset = 100;
+constexpr unsigned TAB_HEIGHT = 45;
 constexpr unsigned rowHeight = 42;
 constexpr unsigned topMargin = 21;
 constexpr unsigned bottomMargin = 11;
@@ -73,7 +73,7 @@ static void addElement(ctrlGroup& page, const glFont* font, const DrawPoint btPo
 iwWares::iwWares(unsigned id, const DrawPoint& pos, unsigned additionalYSpace, const std::string& title,
                  bool allow_outhousing, const glFont* font, const Inventory& inventory, const GamePlayer& player)
     : IngameWindow(id, pos, Extent(167, 416), title, LOADER.GetImageN("io", 5)), inventory(inventory), player(player),
-      numPages(0)
+      nextTabId(ID_pageOffset)
 {
     if(!font)
         font = SmallFont;
@@ -117,12 +117,15 @@ iwWares::iwWares(unsigned id, const DrawPoint& pos, unsigned additionalYSpace, c
     helpers::erase_if(WARE_DISPLAY_ORDER, makeIsUnusedWare(player.GetGameWorld().GetGGS()));
     helpers::erase_if(JOB_DISPLAY_ORDER, makeIsUnusedJob(player.GetGameWorld().GetGGS()));
 
-    // Warenseite hinzufügen
-    ctrlGroup& waresPage = AddPage();
-    warePageID = waresPage.GetID();
-    // Figurenseite hinzufügen
-    ctrlGroup& figuresPage = AddPage();
-    peoplePageID = figuresPage.GetID();
+    // Tab-Control innerhalb des Inhaltsbereichs platzieren (neben Titelleiste)
+    tabCtrl = AddTabCtrl(0, DrawPoint(contentOffset.x, contentOffset.y), GetIwSize().x);
+
+    // Warenseite als Tab hinzufügen
+    ctrlGroup* waresGroup = tabCtrl->AddTab(LOADER.GetImageN("io", 170), _("Goods"), nextTabId);
+    warePageID = nextTabId++;
+    // Figurenseite als Tab hinzufügen
+    ctrlGroup* figuresGroup = tabCtrl->AddTab(LOADER.GetImageN("io", 169), _("People"), nextTabId);
+    peoplePageID = nextTabId++;
 
     bool isRowWithFourElemens = true;
     const unsigned numElements = std::max(WARE_DISPLAY_ORDER.size(), JOB_DISPLAY_ORDER.size());
@@ -139,36 +142,41 @@ iwWares::iwWares(unsigned id, const DrawPoint& pos, unsigned additionalYSpace, c
         }
 
         const Extent btSize(26, 26);
-        const DrawPoint btPos((isRowWithFourElemens ? btSize.x + 1 : btSize.x / 2) + x * 28, topMargin + y * rowHeight);
+        // Content positions are relative to the tab group (inside tab control).
+        // Subtract contentOffset to keep same absolute position, add TAB_HEIGHT to clear tab bar.
+        const DrawPoint btPos((isRowWithFourElemens ? btSize.x + 1 : btSize.x / 2) + x * 28 - contentOffset.x,
+                              topMargin - contentOffset.y + TAB_HEIGHT + y * rowHeight);
 
         if(idx < WARE_DISPLAY_ORDER.size())
         {
             const GoodType rawWare = WARE_DISPLAY_ORDER[idx];
             const GoodType ware = convertShieldToNation(rawWare, player.nation);
-            addElement(waresPage, font, btPos, btSize, rttr::enum_cast(rawWare), _(WARE_NAMES[rawWare]),
+            addElement(*waresGroup, font, btPos, btSize, rttr::enum_cast(rawWare), _(WARE_NAMES[rawWare]),
                        LOADER.GetWareTex(ware), allow_outhousing);
         }
 
         if(idx < JOB_DISPLAY_ORDER.size())
         {
             const Job job = JOB_DISPLAY_ORDER[idx];
-            addElement(figuresPage, font, btPos, btSize, rttr::enum_cast(job), _(JOB_NAMES[job]), LOADER.GetJobTex(job),
+            addElement(*figuresGroup, font, btPos, btSize, rttr::enum_cast(job), _(JOB_NAMES[job]), LOADER.GetJobTex(job),
                        allow_outhousing);
         }
     }
 
-    // compute the final window size
-    Resize(Extent(GetSize().x, topMargin + (y + 1) * rowHeight + spacingBetweenLastRowAndButtonRow + additionalYSpace
-                                 + buttonRowHeight + bottomMargin));
+    // compute the final window size (content + tab bar + buttons)
+    // content starts at TAB_HEIGHT within the tab control, tab control starts at contentOffset.y
+    const unsigned contentHeight = (y + 1) * rowHeight;
+    const unsigned totalHeight = contentOffset.y + TAB_HEIGHT + topMargin + contentHeight
+                                 + spacingBetweenLastRowAndButtonRow + additionalYSpace + buttonRowHeight
+                                 + bottomMargin;
+    Resize(Extent(GetSize().x, totalHeight));
 
-    // "Next page" button
-    AddImageButton(0, DrawPoint(52, GetFullSize().y - 47), Extent(66, 32), TextureColor::Grey,
-                   LOADER.GetImageN("io", 84), _("Next page"));
     // "Help" button
     AddImageButton(12, DrawPoint(16, GetFullSize().y - 47), Extent(32, 32), TextureColor::Grey,
                    LOADER.GetImageN("io", 225), _("Help"));
 
-    waresPage.SetVisible(true);
+    // Ersten Tab auswählen
+    tabCtrl->SetSelection(0, false);
     curPage_ = warePageID;
 }
 
@@ -176,9 +184,6 @@ void iwWares::Msg_ButtonClick(const unsigned ctrl_id)
 {
     switch(ctrl_id)
     {
-        case 0: // "Blättern"
-            SetPage(curPage_ + 1);
-            break;
         case 12: // Hilfe
             WINDOWMANAGER.ReplaceWindow(
               std::make_unique<iwHelp>(_("Here you will find a list of your entire stores of "
@@ -193,10 +198,10 @@ void iwWares::Msg_PaintBefore()
 
     // Farben ggf. aktualisieren
 
-    if(curPage_ != peoplePageID && curPage_ != warePageID)
+    if(!tabCtrl || (curPage_ != peoplePageID && curPage_ != warePageID))
         return;
 
-    auto* group = GetCtrl<ctrlGroup>(curPage_);
+    auto* group = tabCtrl->GetGroup(curPage_);
     if(group)
     {
         const unsigned count =
@@ -235,28 +240,29 @@ void iwWares::Msg_PaintBefore()
 /**
  *  bestimmte Inventurseite zeigen.
  *
- *  @param[in] page Die neue Seite
+ *  @param[in] page Die neue Seite (Tab-ID)
  */
 void iwWares::SetPage(unsigned page)
 {
-    // alte Page verstecken
-    auto* group = GetCtrl<ctrlGroup>(curPage_);
-    if(group)
-        group->SetVisible(false);
-
-    // neue Page setzen
-    curPage_ = (page - ID_pageOffset) % numPages + ID_pageOffset;
-
-    // neue Page anzeigen
-    group = GetCtrl<ctrlGroup>(curPage_);
-    if(group)
-        group->SetVisible(true);
+    curPage_ = page;
+    if(tabCtrl)
+        tabCtrl->SetSelectionByID(page, false);
 }
 
-ctrlGroup& iwWares::AddPage()
+ctrlGroup& iwWares::AddPage(glArchivItem_Bitmap* image, const std::string& tooltip, unsigned& tabId)
 {
-    ctrlGroup& grp = *AddGroup(ID_pageOffset + numPages);
-    numPages++;
-    grp.SetVisible(false);
-    return grp;
+    tabId = nextTabId;
+    ctrlGroup* grp = tabCtrl->AddTab(image, tooltip, nextTabId);
+    nextTabId++;
+    if(!grp)
+        throw std::runtime_error("Failed to add tab page");
+    return *grp;
+}
+
+void iwWares::Msg_TabChange(unsigned ctrl_id, unsigned short tab_id)
+{
+    if(ctrl_id == 0) // tabCtrl ID
+    {
+        SetPage(tab_id);
+    }
 }

@@ -16,5 +16,5 @@ public:
 
 protected:
     void Msg_Group_ButtonClick(unsigned group_id, unsigned ctrl_id) override;
-    unsigned grpIdReserve;
+    unsigned grpIdReserve; /// Tab-ID der Reservierungsseite
 };

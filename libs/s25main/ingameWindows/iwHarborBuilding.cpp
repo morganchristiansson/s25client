@@ -7,6 +7,7 @@
 #include "buildings/nobHarborBuilding.h"
 #include "controls/ctrlGroup.h"
 #include "controls/ctrlImageButton.h"
+#include "controls/ctrlTab.h"
 #include "network/GameClient.h"
 #include "ogl/FontStyle.h"
 
@@ -15,24 +16,29 @@ iwHarborBuilding::iwHarborBuilding(GameWorldView& gwv, GameCommandFactory& gcFac
 {
     SetTitle(_("Harbor building"));
 
-    // Zusätzliche Hafenseite
-    ctrlGroup& harbor_page = AddPage();
-    grpIdExpedition = harbor_page.GetID();
+    constexpr unsigned TAB_HEIGHT = 45;
+
+    // Zusätzliche Hafenseite als Tab
+    ctrlGroup& harbor_page = AddPage(LOADER.GetImageN("io", 176), _("Expedition"), grpIdExpedition);
+
+    const int xOff = -contentOffset.x;
+    const int yOff = TAB_HEIGHT - contentOffset.y;
 
     // "Expedition"-Überschrift
-    harbor_page.AddText(0, DrawPoint(83, 70), _("Expedition"), 0xFFFFFF00, FontStyle::CENTER, NormalFont);
+    harbor_page.AddText(0, DrawPoint(83 + xOff, 70 + yOff), _("Expedition"), 0xFFFFFF00, FontStyle::CENTER, NormalFont);
 
     // Button zum Expedition starten
-    harbor_page.AddImageButton(1, DrawPoint(65, 100), Extent(30, 30), TextureColor::Grey, LOADER.GetImageN("io", 176),
-                               _("Start expedition"));
+    harbor_page.AddImageButton(1, DrawPoint(65 + xOff, 100 + yOff), Extent(30, 30), TextureColor::Grey,
+                               LOADER.GetImageN("io", 176), _("Start expedition"));
     AdjustExpeditionButton(false);
 
     // "Expedition"-Überschrift
-    harbor_page.AddText(2, DrawPoint(83, 140), _("Exploration expedition"), 0xFFFFFF00, FontStyle::CENTER, NormalFont);
+    harbor_page.AddText(2, DrawPoint(83 + xOff, 140 + yOff), _("Exploration expedition"), 0xFFFFFF00, FontStyle::CENTER,
+                        NormalFont);
 
     // Button zum Expedition starten
-    harbor_page.AddImageButton(3, DrawPoint(65, 170), Extent(30, 30), TextureColor::Grey, LOADER.GetImageN("io", 176),
-                               _("Start exporation expedition"));
+    harbor_page.AddImageButton(3, DrawPoint(65 + xOff, 170 + yOff), Extent(30, 30), TextureColor::Grey,
+                               LOADER.GetImageN("io", 176), _("Start exporation expedition"));
     AdjustExplorationExpeditionButton(false);
 }
 
@@ -43,7 +49,7 @@ iwHarborBuilding::iwHarborBuilding(GameWorldView& gwv, GameCommandFactory& gcFac
  */
 void iwHarborBuilding::AdjustExpeditionButton(bool flip)
 {
-    auto* button = GetCtrl<ctrlGroup>(grpIdExpedition)->GetCtrl<ctrlImageButton>(1);
+    auto* button = tabCtrl->GetGroup(grpIdExpedition)->GetCtrl<ctrlImageButton>(1);
 
     // Visuelle Rückmeldung, grün einfärben, wenn Expedition gestartet wurde
     // Jeweils umgekehrte Farbe nehmen, da die änderung ja spielerisch noch nicht
@@ -70,7 +76,7 @@ void iwHarborBuilding::AdjustExpeditionButton(bool flip)
  */
 void iwHarborBuilding::AdjustExplorationExpeditionButton(bool flip)
 {
-    auto* button = GetCtrl<ctrlGroup>(grpIdExpedition)->GetCtrl<ctrlImageButton>(3);
+    auto* button = tabCtrl->GetGroup(grpIdExpedition)->GetCtrl<ctrlImageButton>(3);
 
     // Visuelle Rückmeldung, grün einfärben, wenn Expedition gestartet wurde
     // Jeweils umgekehrte Farbe nehmen, da die änderung ja spielerisch noch nicht
@@ -92,7 +98,7 @@ void iwHarborBuilding::AdjustExplorationExpeditionButton(bool flip)
 
 void iwHarborBuilding::Msg_Group_ButtonClick(const unsigned group_id, const unsigned ctrl_id)
 {
-    if(group_id == grpIdExpedition) // Hafengruppe?
+    if(group_id == tabCtrl->GetID() && tabCtrl->GetCurrentTab() == grpIdExpedition) // Hafentab?
     {
         switch(ctrl_id)
         {

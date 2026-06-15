@@ -77,13 +77,16 @@ void ctrlTab::DeleteAllTabs()
 /**
  *  aktiviert eine bestimmte Tabseite.
  */
-void ctrlTab::SetSelection(unsigned short nr, bool /*notify*/)
+void ctrlTab::SetSelection(unsigned short nr, bool notify)
 {
     if(nr >= tab_count)
         return;
 
-    /// Eltern informieren, dass Tab geändert wurde
-    GetParent()->Msg_TabChange(GetID(), tabs[nr]);
+    if(notify)
+    {
+        /// Eltern informieren, dass Tab geändert wurde
+        GetParent()->Msg_TabChange(GetID(), tabs[nr]);
+    }
 
     // Farbe des alten Buttons ändern
     ctrlButton* button;
@@ -105,6 +108,18 @@ void ctrlTab::SetSelection(unsigned short nr, bool /*notify*/)
 
     // Steuerelemente auf der neuen Tabseite einblenden
     GetCtrl<ctrlGroup>(tabs[nr] + tabs.size() + 1)->SetVisible(true);
+}
+
+void ctrlTab::SetSelectionByID(unsigned id, bool notify)
+{
+    for(unsigned i = 0; i < tab_count; i++)
+    {
+        if(tabs[i] == id)
+        {
+            SetSelection(i, notify);
+            return;
+        }
+    }
 }
 
 /**

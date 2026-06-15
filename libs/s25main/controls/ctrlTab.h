@@ -24,6 +24,10 @@ public:
     void SetSelection(unsigned short nr, bool notify = false);
     /// Gibt ID des aktuell gewählten Tabs zurück
     unsigned GetCurrentTab() const { return tabs[tab_selection]; }
+    /// Gibt Anzahl Tabs zurück
+    unsigned GetTabCount() const { return tab_count; }
+    /// Wählt Tab mit der gegebenen ID aus (sucht nach ID, nicht Index)
+    void SetSelectionByID(unsigned id, bool notify = false);
     /// Gibt Tab-Group zurück, über die die Steuerelemente der Tab angesprochen werden können
     ctrlGroup* GetGroup(unsigned tab_id);
     /// Gibt aktuell ausgewählte Tab-Gruppe zürck

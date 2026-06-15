@@ -6,6 +6,7 @@
 #include "Loader.h"
 #include "buildings/nobBaseWarehouse.h"
 #include "controls/ctrlGroup.h"
+#include "controls/ctrlTab.h"
 #include "network/GameClient.h"
 #include "ogl/FontStyle.h"
 
@@ -14,37 +15,42 @@ iwHQ::iwHQ(GameWorldView& gwv, GameCommandFactory& gcFactory, nobBaseWarehouse* 
 {
     SetTitle(_("Headquarters"));
 
-    // Soldaten Reservierungsseite
-    ctrlGroup& reserve = AddPage();
-    grpIdReserve = reserve.GetID();
+    constexpr unsigned TAB_HEIGHT = 45;
+
+    // Soldaten Reservierungsseite als Tab hinzufügen
+    ctrlGroup& reserve = AddPage(LOADER.GetImageN("io", 171), _("Reserve"), grpIdReserve);
 
     // "Reserve"-Überschrift
-    reserve.AddText(0, DrawPoint(83, 87), _("Reserve"), 0xFFFFFF00, FontStyle::CENTER, NormalFont);
+    reserve.AddText(0, DrawPoint(83 - contentOffset.x, 87 - contentOffset.y + TAB_HEIGHT), _("Reserve"), 0xFFFFFF00,
+                    FontStyle::CENTER, NormalFont);
 
     // Y-Abstand zwischen den Zeilen
     const unsigned Y_DISTANCE = 30;
 
     for(unsigned i = 0; i < 5; ++i)
     {
+        const int xOff = -contentOffset.x;
+        const int yOff = TAB_HEIGHT - contentOffset.y;
         // Bildhintergrund
-        reserve.AddImage(1 + i, DrawPoint(34, 124 + Y_DISTANCE * i), LOADER.GetMapTexture(2298));
+        reserve.AddImage(1 + i, DrawPoint(34 + xOff, 124 + yOff + Y_DISTANCE * i), LOADER.GetMapTexture(2298));
         // Rang-Bild
-        reserve.AddImage(6 + i, DrawPoint(34, 124 + Y_DISTANCE * i), LOADER.GetMapTexture(2321 + i));
+        reserve.AddImage(6 + i, DrawPoint(34 + xOff, 124 + yOff + Y_DISTANCE * i), LOADER.GetMapTexture(2321 + i));
         // Minus-Button
-        reserve.AddImageButton(11 + i, DrawPoint(54, 112 + Y_DISTANCE * i), Extent(24, 24), TextureColor::Red1,
-                               LOADER.GetImageN("io", 139), _("Less"));
+        reserve.AddImageButton(11 + i, DrawPoint(54 + xOff, 112 + yOff + Y_DISTANCE * i), Extent(24, 24),
+                               TextureColor::Red1, LOADER.GetImageN("io", 139), _("Less"));
         // Plus-Button
-        reserve.AddImageButton(16 + i, DrawPoint(118, 112 + Y_DISTANCE * i), Extent(24, 24), TextureColor::Green2,
-                               LOADER.GetImageN("io", 138), _("More"));
+        reserve.AddImageButton(16 + i, DrawPoint(118 + xOff, 112 + yOff + Y_DISTANCE * i), Extent(24, 24),
+                               TextureColor::Green2, LOADER.GetImageN("io", 138), _("More"));
         // Anzahl-Text
-        reserve.AddVarText(21 + i, DrawPoint(100, 117 + Y_DISTANCE * i), _("%u/%u"), 0xFFFFFF00, FontStyle::CENTER,
-                           NormalFont, 2, wh->GetReserveAvailablePointer(i), wh->GetReserveClaimedVisualPointer(i));
+        reserve.AddVarText(21 + i, DrawPoint(100 + xOff, 117 + yOff + Y_DISTANCE * i), _("%u/%u"), 0xFFFFFF00,
+                           FontStyle::CENTER, NormalFont, 2, wh->GetReserveAvailablePointer(i),
+                           wh->GetReserveClaimedVisualPointer(i));
     }
 }
 
 void iwHQ::Msg_Group_ButtonClick(const unsigned group_id, const unsigned ctrl_id)
 {
-    if(group_id == grpIdReserve)
+    if(group_id == tabCtrl->GetID() && tabCtrl->GetCurrentTab() == grpIdReserve)
     {
         RTTR_Assert(ctrl_id >= 11 && ctrl_id < 21);
         unsigned rank = 0, newReserve = 0, oldReserve = 0;
